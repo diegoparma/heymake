@@ -1,0 +1,1 @@
+"""HeyAI Backend Application"""
