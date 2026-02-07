@@ -3,9 +3,9 @@ services:
   # Backend API
   - type: web
     name: heymake-backend
-    env: python
-    buildCommand: cd backend && pip install -r requirements.txt
-    startCommand: cd backend && python main.py
+    env: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
     envVars:
       - key: ENV
         value: production
@@ -45,12 +45,12 @@ services:
       - key: CORS_ORIGINS
         value: https://heymake-frontend.onrender.com,https://your-domain.com
 
-  # Frontend (Static Site)
+  # Frontend
   - type: web
     name: heymake-frontend
-    env: static
-    buildCommand: cd frontend && npm ci && npm run build
-    staticPublishPath: frontend/out
+    env: docker
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
     envVars:
       - key: NEXT_PUBLIC_API_URL
         fromService:
