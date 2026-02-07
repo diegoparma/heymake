@@ -89,6 +89,7 @@ export default function ProjectDetailPage({
   const [selectedImage, setSelectedImage] = useState<Asset | null>(null);
   const [generationProgress, setGenerationProgress] = useState(0);
   const [progressMessage, setProgressMessage] = useState("");
+  const [generationError, setGenerationError] = useState<string | null>(null);
   const [expandedScenes, setExpandedScenes] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -191,6 +192,7 @@ export default function ProjectDetailPage({
     setGeneratingImages(true);
     setGenerationProgress(0);
     setProgressMessage("Conectando con el servidor...");
+    setGenerationError(null);
 
     try {
       // Usar SSE para progreso en tiempo real
@@ -222,11 +224,33 @@ export default function ProjectDetailPage({
             
           case "scene_error":
             setProgressMessage(`⚠️ ${data.message}`);
+            // Si es un error de quota/créditos, mostrar error persistente
+            if (data.error_code === "quota_exhausted" || data.error_code === "no_credits") {
+              setGenerationError(data.message);
+            }
+            break;
+
+          case "fatal_error":
+            // Error fatal: quota agotada, sin créditos, etc.
+            setGenerationError(data.message);
+            setProgressMessage(data.message);
+            eventSource.close();
+            setTimeout(() => {
+              loadProject();
+              loadScenes();
+              loadAssets();
+              setGenerationProgress(0);
+              setProgressMessage("");
+              setGeneratingImages(false);
+            }, 2000);
             break;
             
           case "complete":
             setGenerationProgress(100);
             setProgressMessage(data.message);
+            if (data.generated === 0) {
+              setGenerationError(`No se pudo generar ninguna imagen. Probá con otro proveedor.`);
+            }
             eventSource.close();
             
             setTimeout(() => {
@@ -240,7 +264,7 @@ export default function ProjectDetailPage({
             break;
             
           case "error":
-            alert(`Error: ${data.message}`);
+            setGenerationError(data.message);
             eventSource.close();
             setGenerationProgress(0);
             setProgressMessage("");
@@ -264,7 +288,7 @@ export default function ProjectDetailPage({
             setGeneratingImages(false);
           }, 1500);
         } else {
-          alert("Error de conexión con el servidor");
+          setGenerationError("Error de conexión con el servidor. Verificá que el backend esté corriendo.");
           setGenerationProgress(0);
           setProgressMessage("");
           setGeneratingImages(false);
@@ -459,6 +483,34 @@ export default function ProjectDetailPage({
       <AnimatePresence>
         {(analyzing || generatingImages) && generationProgress > 0 && (
           <ProgressBar progress={generationProgress} message={progressMessage} />
+        )}
+      </AnimatePresence>
+
+      {/* Error Banner */}
+      <AnimatePresence>
+        {generationError && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-20 left-1/2 -translate-x-1/2 z-50 max-w-2xl w-full px-4"
+          >
+            <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 backdrop-blur-xl shadow-2xl">
+              <div className="flex items-start gap-3">
+                <div className="text-red-400 text-xl flex-shrink-0">⚠️</div>
+                <div className="flex-1">
+                  <p className="text-red-300 text-sm font-medium">Error de generación</p>
+                  <p className="text-red-200/80 text-sm mt-1">{generationError}</p>
+                </div>
+                <button
+                  onClick={() => setGenerationError(null)}
+                  className="text-red-400 hover:text-red-300 flex-shrink-0"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
 

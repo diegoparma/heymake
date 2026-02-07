@@ -383,10 +383,23 @@ async def generate_images_stream(
                     style=project.get("style", "cinematic")
                 )
                 
+                # Verificar si el servicio retornó un error explícito
+                if isinstance(result, dict) and result.get("success") is False:
+                    error_msg = result.get("error", "Error desconocido")
+                    error_code = result.get("error_code", "unknown")
+                    
+                    yield f"data: {json.dumps({'type': 'scene_error', 'scene': scene_number, 'error_code': error_code, 'message': f'❌ Escena {scene_number}: {error_msg}'})}\n\n"
+                    
+                    # Si es quota agotada o sin créditos, abortar el resto
+                    if error_code in ('quota_exhausted', 'no_credits', 'no_api_key'):
+                        yield f"data: {json.dumps({'type': 'fatal_error', 'error_code': error_code, 'message': f'🛑 {error_msg}. No se pueden generar más imágenes.'})}\n\n"
+                        break
+                    continue
+                
                 image_url = result.get("image_url") or result.get("url")
                 
                 if not image_url:
-                    yield f"data: {json.dumps({'type': 'scene_error', 'scene': scene_number, 'message': f'No se pudo generar imagen para escena {scene_number}'})}\n\n"
+                    yield f"data: {json.dumps({'type': 'scene_error', 'scene': scene_number, 'error_code': 'no_image', 'message': f'No se pudo generar imagen para escena {scene_number}'})}\n\n"
                     continue
                 
                 # Nombre de archivo único
@@ -452,7 +465,23 @@ async def generate_images_stream(
                 yield f"data: {json.dumps({'type': 'scene_complete', 'scene': scene_number, 'total': total_scenes, 'image_url': final_url, 'message': f'✅ Imagen {scene_number}/{total_scenes} completada'})}\n\n"
                 
             except Exception as e:
-                yield f"data: {json.dumps({'type': 'scene_error', 'scene': scene_number, 'message': f'Error: {str(e)}'})}\n\n"
+                error_str = str(e)
+                error_code = "unexpected_error"
+                
+                # Detectar errores comunes por el mensaje
+                if "429" in error_str or "quota" in error_str.lower() or "rate" in error_str.lower():
+                    error_code = "quota_exhausted"
+                    yield f"data: {json.dumps({'type': 'scene_error', 'scene': scene_number, 'error_code': error_code, 'message': f'❌ Quota agotada: {error_str[:200]}'})}\n\n"
+                    yield f"data: {json.dumps({'type': 'fatal_error', 'error_code': error_code, 'message': '🛑 Se agotó la quota de la API. No se pueden generar más imágenes.'})}\n\n"
+                    break
+                elif "403" in error_str or "credits" in error_str.lower():
+                    error_code = "no_credits"
+                elif "nsfw" in error_str.lower() or "safety" in error_str.lower():
+                    error_code = "nsfw"
+                elif "timeout" in error_str.lower():
+                    error_code = "timeout"
+                
+                yield f"data: {json.dumps({'type': 'scene_error', 'scene': scene_number, 'error_code': error_code, 'message': f'Error: {error_str[:200]}'})}\n\n"
                 continue
         
         # Actualizar estado del proyecto

@@ -1,0 +1,72 @@
+# render.yaml - Full deployment configuration for Render
+services:
+  # Backend API
+  - type: web
+    name: heymake-backend
+    env: python
+    buildCommand: cd backend && pip install -r requirements.txt
+    startCommand: cd backend && python main.py
+    envVars:
+      - key: ENV
+        value: production
+      - key: DEBUG
+        value: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: API_HOST
+        value: 0.0.0.0
+      - key: API_PORT
+        value: 8000
+      - key: DATABASE_URL
+        sync: false  # Set in Render dashboard
+      - key: DATABASE_AUTH_TOKEN
+        sync: false  # Set in Render dashboard
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: heymake-redis
+          property: connectionString
+      - key: OPENAI_API_KEY
+        sync: false  # Set in Render dashboard
+      - key: GOOGLE_AI_API_KEY
+        sync: false  # Set in Render dashboard
+      - key: HIGGSFIELD_API_KEY_ID
+        sync: false  # Set in Render dashboard
+      - key: HIGGSFIELD_API_KEY_SECRET
+        sync: false  # Set in Render dashboard
+      - key: HIGGSFIELD_API_URL
+        value: https://platform.higgsfield.ai
+      - key: KLING_API_KEY
+        sync: false  # Set in Render dashboard
+      - key: LLM_PROVIDER
+        value: openai
+      - key: LLM_MODEL
+        value: gpt-4-turbo-preview
+      - key: CORS_ORIGINS
+        value: https://heymake-frontend.onrender.com,https://your-domain.com
+
+  # Frontend (Static Site)
+  - type: web
+    name: heymake-frontend
+    env: static
+    buildCommand: cd frontend && npm ci && npm run build
+    staticPublishPath: frontend/out
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          type: web
+          name: heymake-backend
+          property: host
+      - key: NODE_ENV
+        value: production
+
+  # Redis
+  - type: redis
+    name: heymake-redis
+    ipAllowList: []
+    plan: starter
+    maxmemoryPolicy: allkeys-lru
+
+# Database (external)
+databases:
+  # Note: Turso is external, configure DATABASE_URL in environment variables
