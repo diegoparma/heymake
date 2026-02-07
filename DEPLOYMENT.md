@@ -6,6 +6,8 @@
 - [x] Configuraciones de deployment creadas (vercel.json, render.yaml)
 - [x] Documentación actualizada (README.md)
 - [x] Variables de entorno documentadas (.env.example)
+- [x] **Dockerfiles optimizados y configurados correctamente**
+- [x] **Render configurado para usar Docker explícitamente**
 
 ## 🎯 Próximos pasos para deployment
 
@@ -101,6 +103,14 @@
 
 ## 🆘 Si algo falla
 
+### Error: "failed to read dockerfile: open Dockerfile: no such file or directory"
+**✅ SOLUCIONADO** - El proyecto ahora incluye Dockerfiles optimizados para backend y frontend.
+
+- **Causa:** Render detectaba archivos que indicaban uso de Docker pero el `render.yaml` estaba configurado para buildpacks automáticos
+- **Solución:** Configurado explícitamente `env: docker` con rutas correctas en `render.yaml`
+- **Files:** `/backend/Dockerfile`, `/frontend/Dockerfile`, `/render.yaml` actualizado
+
+### Otros problemas comunes:
 1. **Revisar logs** en las consolas de deployment
 2. **Verificar variables de entorno**
 3. **Comprobar que las APIs respondan**
