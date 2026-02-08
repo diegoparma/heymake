@@ -1,11 +1,11 @@
-# render.yaml - Full deployment configuration for Render
+# render.yaml - Configuración simple sin Docker para HeyMake
 services:
-  # Backend API
+  # Backend API - Python
   - type: web
     name: heymake-backend
-    env: docker
-    dockerfilePath: ./backend/Dockerfile
-    dockerContext: ./backend
+    env: python
+    buildCommand: cd backend && pip install -r requirements.txt
+    startCommand: cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: ENV
         value: production
@@ -16,10 +16,10 @@ services:
       - key: API_HOST
         value: 0.0.0.0
       - key: API_PORT
-        value: 8000
-      - key: DATABASE_URL
+        value: $PORT
+      - key: TURSO_DATABASE_URL
         sync: false  # Set in Render dashboard
-      - key: DATABASE_AUTH_TOKEN
+      - key: TURSO_AUTH_TOKEN
         sync: false  # Set in Render dashboard
       - key: REDIS_URL
         fromService:
@@ -28,11 +28,11 @@ services:
           property: connectionString
       - key: OPENAI_API_KEY
         sync: false  # Set in Render dashboard
-      - key: GOOGLE_AI_API_KEY
+      - key: GEMINI_API_KEY
         sync: false  # Set in Render dashboard
-      - key: HIGGSFIELD_API_KEY_ID
+      - key: HIGGSFIELD_KEY_ID
         sync: false  # Set in Render dashboard
-      - key: HIGGSFIELD_API_KEY_SECRET
+      - key: HIGGSFIELD_SECRET
         sync: false  # Set in Render dashboard
       - key: HIGGSFIELD_API_URL
         value: https://platform.higgsfield.ai
@@ -45,12 +45,13 @@ services:
       - key: CORS_ORIGINS
         value: https://heymake-frontend.onrender.com,https://your-domain.com
 
-  # Frontend
+  # Frontend - Node.js
   - type: web
     name: heymake-frontend
-    env: docker
-    dockerfilePath: ./frontend/Dockerfile
-    dockerContext: ./frontend
+    env: node
+    buildCommand: cd frontend && npm ci && npm run build
+    startCommand: cd frontend && npm run start
+    publishPath: frontend
     envVars:
       - key: NEXT_PUBLIC_API_URL
         fromService:
@@ -60,13 +61,14 @@ services:
       - key: NODE_ENV
         value: production
 
-  # Redis
+  # Redis Cache
   - type: redis
     name: heymake-redis
     ipAllowList: []
     plan: starter
     maxmemoryPolicy: allkeys-lru
 
-# Database (external)
-databases:
-  # Note: Turso is external, configure DATABASE_URL in environment variables
+# External Database Notes:
+# Turso database is external - configure these in Render dashboard:
+# - TURSO_DATABASE_URL: libsql://your-db.turso.io  
+# - TURSO_AUTH_TOKEN: your-auth-token
