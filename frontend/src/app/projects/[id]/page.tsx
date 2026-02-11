@@ -85,7 +85,7 @@ export default function ProjectDetailPage({
   const [generatingImages, setGeneratingImages] = useState(false);
   const [animatingScenes, setAnimatingScenes] = useState(false);
   const [imageProvider, setImageProvider] = useState<"dalle" | "aimlapi" | "higgsfield" | "gemini">("gemini");
-  const [videoProvider, setVideoProvider] = useState<"veo" | "kling">("veo");
+  const [videoProvider, setVideoProvider] = useState<"veo" | "kling" | "sora">("veo");
   const [selectedImage, setSelectedImage] = useState<Asset | null>(null);
   const [generationProgress, setGenerationProgress] = useState(0);
   const [progressMessage, setProgressMessage] = useState("");
@@ -312,7 +312,8 @@ export default function ProjectDetailPage({
 
     setAnimatingScenes(true);
     setGenerationProgress(0);
-    setProgressMessage("Iniciando animación con Gemini Veo 2...");
+    const providerName = videoProvider === "veo" ? "Veo 3.1" : videoProvider === "kling" ? "Kling" : "Sora";
+    setProgressMessage(`Iniciando animación con ${providerName}...`);
 
     try {
       // Llamar al endpoint de animación en batch
@@ -728,7 +729,7 @@ export default function ProjectDetailPage({
                         ) : (
                           <>
                             <Play className="h-5 w-5 text-cyan-400" />
-                            Animar escenas con {videoProvider === "veo" ? "Veo 3.1" : "Kling"}
+                            Animar escenas con {videoProvider === "veo" ? "Veo 3.1" : videoProvider === "kling" ? "Kling" : "Sora"}
                           </>
                         )}
                       </span>
@@ -741,6 +742,7 @@ export default function ProjectDetailPage({
                     >
                       <option value="veo">Veo 3.1</option>
                       <option value="kling">Kling AI</option>
+                      <option value="sora">Sora (OpenAI)</option>
                     </select>
                   </div>
                 </div>

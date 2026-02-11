@@ -17,7 +17,9 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload, MediaIoBaseUpload, MediaIoBaseDownload
 from googleapiclient.errors import HttpError
 
+
 from app.core.config import settings
+from app.services.supabase_storage_service import SupabaseStorageService
 
 
 class StorageService:
@@ -26,7 +28,8 @@ class StorageService:
     SCOPES = ['https://www.googleapis.com/auth/drive.file']
     
     def __init__(self):
-        self.provider = settings.STORAGE_PROVIDER
+        # Normalizamos el provider para evitar problemas por espacios o mayúsculas
+        self.provider = settings.STORAGE_PROVIDER.strip().lower()
         self.base_path = Path("uploads")
         self.drive_service = None
         self.folder_id = settings.GOOGLE_DRIVE_FOLDER_ID
@@ -36,6 +39,20 @@ class StorageService:
             self._setup_local()
         elif self.provider == "gdrive":
             self._setup_google_drive_service_account()
+        elif self.provider == "supabase":
+            self.supabase = SupabaseStorageService()
+
+    async def upload_image_from_url(self, image_url: str, filename: str) -> str:
+        """Sube una imagen a Supabase a partir de una URL"""
+        return await self.supabase.upload_image_from_url(image_url, filename)
+
+    async def upload_image_from_base64(self, base64_data: str, filename: str) -> str:
+        """Sube una imagen a Supabase a partir de datos base64"""
+        return await self.supabase.upload_image_from_base64(base64_data, filename)
+
+    async def delete_image_from_supabase(self, filename: str) -> bool:
+        """Elimina una imagen del bucket de Supabase"""
+        return await self.supabase.delete_image(filename)
     
     def _setup_local(self):
         """Setup para almacenamiento local"""
@@ -76,21 +93,20 @@ class StorageService:
     ) -> Dict[str, str]:
         """
         Guarda un archivo
-        
-        Args:
-            file_content: Contenido del archivo en bytes
-            filename: Nombre del archivo
-            folder: Carpeta donde guardar (images, videos, audio)
-            mime_type: Tipo MIME del archivo
-        
-        Returns:
-            Dict con file_id, file_path/url, y web_view_link
         """
-        
         if self.provider == "local":
             return await self._save_local(file_content, filename, folder)
         elif self.provider == "gdrive":
             return await self._save_google_drive(file_content, filename, folder, mime_type)
+        elif self.provider == "supabase":
+            # Guardar en Supabase bucket
+            unique_filename = f"{uuid.uuid4().hex}_{filename}"
+            url = await self.supabase._upload_bytes(file_content, unique_filename)
+            return {
+                "file_id": unique_filename,
+                "file_path": url,
+                "web_view_link": url,
+            }
         else:
             raise ValueError(f"Unsupported storage provider: {self.provider}")
     
@@ -180,6 +196,14 @@ class StorageService:
                 return f.read()
         elif self.provider == "gdrive":
             return await self._get_from_google_drive(file_id)
+        elif self.provider == "supabase":
+            # Descargar desde Supabase Storage
+            url = self.supabase.get_public_url(file_id)
+            import httpx
+            async with httpx.AsyncClient() as client:
+                response = await client.get(url)
+                response.raise_for_status()
+                return response.content
         else:
             raise NotImplementedError(f"Get file not implemented for {self.provider}")
     
@@ -223,6 +247,8 @@ class StorageService:
                 return False
         elif self.provider == "gdrive":
             return await self._delete_from_google_drive(file_id)
+        elif self.provider == "supabase":
+            return await self.supabase.delete_image(file_id)
         else:
             raise NotImplementedError(f"Delete file not implemented for {self.provider}")
     
@@ -251,6 +277,8 @@ class StorageService:
         
         if self.provider == "gdrive":
             return f"https://drive.google.com/file/d/{file_id}/view"
+        elif self.provider == "supabase":
+            return self.supabase.get_public_url(file_id)
         else:
             return f"file://{file_id}"
 

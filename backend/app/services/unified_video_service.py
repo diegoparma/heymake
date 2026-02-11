@@ -4,11 +4,20 @@ Servicio unificado para generación de videos con múltiples proveedores
 """
 from typing import Dict, Any, Optional, Literal
 from app.services.video_service import kling_service
-from app.services.veo_service import veo_service
+from app.services.sora_service import sora_service
+
+# Import lazy for optional providers to avoid hard failures when deps no están
+try:
+    from app.services.veo_service import veo_service  # type: ignore
+    _veo_available = True
+except Exception as exc:
+    veo_service = None  # type: ignore
+    _veo_available = False
+    print(f"⚠️ Veo service no disponible: {exc}")
 from app.core.config import settings
 
 
-VideoProvider = Literal["kling", "veo", "runway", "pika"]
+VideoProvider = Literal["kling", "veo", "sora", "runway", "pika"]
 
 
 class UnifiedVideoService:
@@ -17,12 +26,15 @@ class UnifiedVideoService:
     def __init__(self):
         self.providers = {
             "kling": kling_service,
-            "veo": veo_service,
-            # Preparado para futuros proveedores:
-            # "runway": runway_service,
-            # "pika": pika_service,
+            "sora": sora_service,
         }
-        self.default_provider = "veo"  # Veo 2 (Gemini) por defecto
+        if _veo_available:
+            self.providers["veo"] = veo_service  # type: ignore
+        # Preparado para futuros proveedores:
+        # "runway": runway_service,
+        # "pika": pika_service,
+        
+        self.default_provider = "veo" if _veo_available else "sora"
     
     def get_provider(self, provider: Optional[str] = None):
         """Obtiene el servicio del proveedor especificado"""
@@ -153,7 +165,7 @@ class UnifiedVideoService:
         Returns:
             Dict con información de cada proveedor
         """
-        return {
+        providers_info = {
             "kling": {
                 "name": "Kling AI",
                 "available": True,
@@ -162,7 +174,18 @@ class UnifiedVideoService:
                 "resolutions": ["720p", "1080p"],
                 "motion_types": ["auto", "zoom_in", "zoom_out", "pan_left", "pan_right"]
             },
-            "veo": {
+            "sora": {
+                "name": "OpenAI Sora",
+                "available": True,
+                "features": ["text-to-video", "image-to-video"],
+                "max_duration": None,
+                "resolutions": ["auto"],
+                "aspect_ratios": ["16:9", "9:16"],
+                "note": "Usa OPENAI_API_KEY; endpoints pueden variar según acceso"
+            }
+        }
+        if _veo_available:
+            providers_info["veo"] = {
                 "name": "Google Veo 3.1",
                 "available": True,
                 "features": ["image-to-video", "text-to-video"],
@@ -171,7 +194,17 @@ class UnifiedVideoService:
                 "aspect_ratios": ["16:9", "9:16"],
                 "note": "Uses same GOOGLE_AI_API_KEY as Gemini"
             }
-        }
+        else:
+            providers_info["veo"] = {
+                "name": "Google Veo 3.1",
+                "available": False,
+                "features": ["image-to-video", "text-to-video"],
+                "max_duration": 8,
+                "resolutions": ["720p", "1080p", "4k"],
+                "aspect_ratios": ["16:9", "9:16"],
+                "note": "Dependencia google-genai no instalada"
+            }
+        return providers_info
 
 
 # Singleton instance

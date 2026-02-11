@@ -157,7 +157,6 @@ async def generate_images(
     for scene in scenes_result:
         try:
             print(f"🎨 Generating image for scene {scene['order_index']}: {scene['title']}")
-            
             # Generar imagen con el proveedor seleccionado
             result = await image_generator.generate_image(
                 prompt=scene["image_prompt"],
@@ -165,87 +164,67 @@ async def generate_images(
                 height=768,
                 style=project.get("style", "cinematic")
             )
-            
             print(f"✅ Image generated: {result}")
-            
-            # Obtener la URL de la imagen
             image_url = result.get("image_url") or result.get("url")
-            
             if not image_url:
                 print(f"❌ No image URL returned for scene {scene['order_index']}")
                 continue
-            
-            # Procesar imagen: guardar localmente o usar URL externa
-            final_url = None
-            import base64
-            from pathlib import Path
-            
-            # Crear directorio de imágenes si no existe
-            images_dir = Path("uploads/images")
-            images_dir.mkdir(parents=True, exist_ok=True)
-            
             # Nombre de archivo único
             filename = f"scene_{project_id[:8]}_{scene['order_index']:02d}_{scene['id'][:8]}.png"
-            file_path = images_dir / filename
-            
-            # Si es data URL (Gemini), decodificar y guardar localmente
-            if image_url.startswith("data:"):
-                try:
-                    # Decodificar base64
-                    header, encoded = image_url.split(",", 1)
-                    image_bytes = base64.b64decode(encoded)
-                    
-                    # Guardar archivo localmente
-                    with open(file_path, "wb") as f:
-                        f.write(image_bytes)
-                    
-                    # URL completa (accesible desde frontend)
-                    final_url = f"http://localhost:8000/api/v1/assets/image/{filename}"
-                    print(f"💾 Image saved locally: {file_path} ({len(image_bytes)} bytes)")
-                    
-                except Exception as e:
-                    print(f"❌ Error saving image locally: {e}")
+            # Si el storage es supabase
+            if storage.provider == "supabase":
+                if image_url.startswith("data:"):
+                    final_url = await storage.upload_image_from_base64(image_url, filename)
+                else:
+                    final_url = await storage.upload_image_from_url(image_url, filename)
+                print(f"💾 Image uploaded to Supabase: {final_url}")
+            else:
+                # ...existing code for local/gdrive...
+                import base64
+                from pathlib import Path
+                images_dir = Path("uploads/images")
+                images_dir.mkdir(parents=True, exist_ok=True)
+                file_path = images_dir / filename
+                if image_url.startswith("data:"):
+                    try:
+                        header, encoded = image_url.split(",", 1)
+                        image_bytes = base64.b64decode(encoded)
+                        with open(file_path, "wb") as f:
+                            f.write(image_bytes)
+                        final_url = f"http://localhost:8000/api/v1/assets/image/{filename}"
+                        print(f"💾 Image saved locally: {file_path} ({len(image_bytes)} bytes)")
+                    except Exception as e:
+                        print(f"❌ Error saving image locally: {e}")
+                        continue
+                elif image_url.startswith("http"):
+                    try:
+                        import httpx
+                        async with httpx.AsyncClient(timeout=30.0) as http_client:
+                            img_response = await http_client.get(image_url)
+                            if img_response.status_code == 200:
+                                image_bytes = img_response.content
+                                with open(file_path, "wb") as f:
+                                    f.write(image_bytes)
+                                final_url = f"http://localhost:8000/api/v1/assets/image/{filename}"
+                                print(f"💾 Image downloaded and saved: {file_path} ({len(image_bytes)} bytes)")
+                            else:
+                                print(f"⚠️ Failed to download image: {img_response.status_code}")
+                                continue
+                    except Exception as e:
+                        print(f"❌ Error downloading image: {e}")
+                        continue
+                else:
+                    print(f"❌ Could not process image for scene {scene['order_index']}")
                     continue
-                    
-            # Si es URL HTTP (DALL-E), descargar y guardar localmente
-            elif image_url.startswith("http"):
-                try:
-                    import httpx
-                    
-                    async with httpx.AsyncClient(timeout=30.0) as http_client:
-                        img_response = await http_client.get(image_url)
-                        if img_response.status_code == 200:
-                            image_bytes = img_response.content
-                            
-                            # Guardar archivo localmente
-                            with open(file_path, "wb") as f:
-                                f.write(image_bytes)
-                            
-                            # URL completa (accesible desde frontend)
-                            final_url = f"http://localhost:8000/api/v1/assets/image/{filename}"
-                            print(f"💾 Image downloaded and saved: {file_path} ({len(image_bytes)} bytes)")
-                        else:
-                            print(f"⚠️ Failed to download image: {img_response.status_code}")
-                            continue
-                            
-                except Exception as e:
-                    print(f"❌ Error downloading image: {e}")
-                    continue
-            
             if not final_url:
                 print(f"❌ Could not process image for scene {scene['order_index']}")
                 continue
-            
-            # Guardar la URL local en la base de datos
             asset_id = str(uuid.uuid4())
-            
             print(f"💾 Saving asset to database...")
             print(f"   Asset ID: {asset_id}")
             print(f"   Scene ID: {scene['id']}")
-            print(f"   Local URL: {final_url}")
+            print(f"   URL: {final_url}")
             print(f"   File: {filename}")
-            
-            # Crear registro del asset
             try:
                 metadata_json = json.dumps({
                     "filename": filename,
@@ -272,18 +251,13 @@ async def generate_images(
                 import traceback
                 traceback.print_exc()
                 continue
-            
-            # Actualizar estado de la escena
             await turso_client.execute(
                 "UPDATE scenes SET status = ? WHERE id = ?",
                 ["image_ready", scene["id"]]
             )
-            
             generated_count += 1
-            
         except Exception as e:
             print(f"Error generating image for scene {scene['id']}: {e}")
-            # Continuar con la siguiente escena
             continue
     
     # Actualizar estado del proyecto

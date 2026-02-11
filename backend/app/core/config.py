@@ -44,11 +44,20 @@ class Settings(BaseSettings):
     # Kling AI
     KLING_API_KEY: str
     KLING_API_URL: str = "https://api.klingai.com/v1"
+
+    # OpenAI Sora (text/video)
+    SORA_MODEL: str = "sora-1.0"
+    SORA_API_BASE: str = "https://api.openai.com/v1"
     
     # Storage - Google Drive
     STORAGE_PROVIDER: str = "local"
     GOOGLE_DRIVE_CREDENTIALS_FILE: str = "credentials.json"
     GOOGLE_DRIVE_FOLDER_ID: str = ""
+
+    # Supabase Storage
+    SUPABASE_URL: str = ""
+    SUPABASE_ANON_KEY: str = ""
+    SUPABASE_SERVICE_KEY: str = ""
     
     # CORS
     CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
