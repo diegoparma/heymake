@@ -22,12 +22,12 @@ class Settings(BaseSettings):
     DATABASE_AUTH_TOKEN: str = ""
     DATABASE_ECHO: bool = False
     
-    # Redis
-    REDIS_URL: str
+    # Redis (optional for production without workers)
+    REDIS_URL: str = ""
     
-    # Celery
-    CELERY_BROKER_URL: str
-    CELERY_RESULT_BACKEND: str
+    # Celery (optional - only needed for background tasks)
+    CELERY_BROKER_URL: str = ""
+    CELERY_RESULT_BACKEND: str = ""
     
     # LLM APIs
     OPENAI_API_KEY: str = ""
