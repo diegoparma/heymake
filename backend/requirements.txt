@@ -6,6 +6,7 @@ pydantic-settings>=2.1.0
 
 # Database - Turso (via HTTP, no native driver needed)
 sqlalchemy>=2.0.25
+aiosqlite>=0.19.0
 
 # Redis & Celery
 redis>=5.0.1

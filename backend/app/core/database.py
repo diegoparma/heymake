@@ -1,6 +1,6 @@
 """
 Database configuration and session management
-Using Turso (LibSQL) for serverless SQLite
+Using Turso (LibSQL) for serverless SQLite via HTTP API
 """
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import declarative_base
@@ -9,7 +9,7 @@ import httpx
 
 from app.core.config import settings
 
-# For Turso, we'll use httpx to interact with their HTTP API
+# For Turso, we use httpx to interact with their HTTP API
 # This is simpler than compiling libsql native bindings
 
 class TursoClient:
