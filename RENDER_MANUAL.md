@@ -47,7 +47,7 @@ CORS_ORIGINS=*
 | **Language** | `Node` |
 | **Branch** | `main` |
 | **Root Directory** | *(leave blank)* |
-| **Build Command** | `cd frontend && npm ci && npm run build` |
+| **Build Command** | `cd frontend && npm install && npm run build` |
 | **Start Command** | `cd frontend && npm run start` |
 
 **Environment Variables:**
