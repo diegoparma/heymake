@@ -49,7 +49,7 @@ services:
   - type: web
     name: heymake-frontend
     env: node
-    buildCommand: cd frontend && npm install && npm run build
+    buildCommand: cd frontend && npm ci && npm run build
     startCommand: cd frontend && npm run start
     publishPath: frontend
     envVars:
