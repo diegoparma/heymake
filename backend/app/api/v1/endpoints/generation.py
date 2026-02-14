@@ -44,13 +44,21 @@ async def analyze_script(request: ScriptAnalysisRequest):
     project = result[0]
     
     # Analizar el guión con LLM
-    llm_service = LLMService()
-    scenes = await llm_service.analyze_script(
-        script=request.script,
-        style=project.get("style", "cinematic"),
-        reference_prompt=project.get("reference_prompt"),
-        duration_target=project.get("duration_target")
-    )
+    try:
+        llm_service = LLMService()
+        scenes = await llm_service.analyze_script(
+            script=request.script,
+            style=project.get("style", "cinematic"),
+            reference_prompt=project.get("reference_prompt"),
+            duration_target=project.get("duration_target")
+        )
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al analizar guión con LLM: {str(e)}"
+        )
     
     # Guardar las escenas en la base de datos
     for scene in scenes:
@@ -85,7 +93,7 @@ async def analyze_script(request: ScriptAnalysisRequest):
         project_id=request.project_id,
         scenes=scenes,
         total_scenes=len(scenes),
-        estimated_duration=sum(s.duration for s in scenes)
+        estimated_duration=sum(s.duration or 3.0 for s in scenes)
     )
 
 

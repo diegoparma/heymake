@@ -168,14 +168,21 @@ export default function ProjectDetailPage({
           setProgressMessage("");
         }, 1500);
       } else {
-        const error = await response.json();
-        alert(`Error: ${error.detail || "No se pudo analizar el guión"}`);
+        const errorText = await response.text();
+        let errorMsg = "No se pudo analizar el guión";
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMsg = errorData.detail || errorMsg;
+        } catch {
+          errorMsg = errorText || errorMsg;
+        }
+        alert(`Error: ${errorMsg}`);
         setGenerationProgress(0);
         setProgressMessage("");
       }
     } catch (error) {
-      console.error(error);
-      alert("Error al analizar el guión");
+      console.error("Analyze script error:", error);
+      alert(`Error al analizar el guión: ${error instanceof Error ? error.message : "Error de conexión"}`);
       setGenerationProgress(0);
       setProgressMessage("");
     } finally {

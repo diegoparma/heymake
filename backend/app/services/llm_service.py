@@ -142,5 +142,6 @@ Responde ÚNICAMENTE con un JSON válido con este formato:
         return [SceneBreakdown(**scene) for scene in data["scenes"]]
 
 
-# Singleton instance
-llm_service = LLMService()
+# Lazy singleton - don't crash on import if OPENAI_API_KEY is missing
+def get_llm_service():
+    return LLMService()
