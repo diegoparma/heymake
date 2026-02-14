@@ -199,7 +199,7 @@ async def generate_images(
                         image_bytes = base64.b64decode(encoded)
                         with open(file_path, "wb") as f:
                             f.write(image_bytes)
-                        final_url = f"http://localhost:8000/api/v1/assets/image/{filename}"
+                        final_url = f"/api/v1/assets/image/{filename}"
                         print(f"💾 Image saved locally: {file_path} ({len(image_bytes)} bytes)")
                     except Exception as e:
                         print(f"❌ Error saving image locally: {e}")
@@ -213,7 +213,7 @@ async def generate_images(
                                 image_bytes = img_response.content
                                 with open(file_path, "wb") as f:
                                     f.write(image_bytes)
-                                final_url = f"http://localhost:8000/api/v1/assets/image/{filename}"
+                                final_url = f"/api/v1/assets/image/{filename}"
                                 print(f"💾 Image downloaded and saved: {file_path} ({len(image_bytes)} bytes)")
                             else:
                                 print(f"⚠️ Failed to download image: {img_response.status_code}")
@@ -299,6 +299,7 @@ async def generate_images_stream(
         from app.services.dalle_service import DalleService
         from app.services.gemini_image_service import GeminiImageService
         from app.services.storage_service import StorageService
+        from app.core.config import settings
         import base64
         from pathlib import Path
         
@@ -386,20 +387,16 @@ async def generate_images_stream(
                 
                 # Nombre de archivo único
                 filename = f"scene_{project_id[:8]}_{scene['order_index']:02d}_{scene['id'][:8]}.png"
-                file_path = images_dir / filename
                 
-                # Procesar imagen
-                final_url = None
+                # Get image bytes
+                image_bytes = None
                 
                 if image_url.startswith("data:"):
                     try:
                         header, encoded = image_url.split(",", 1)
                         image_bytes = base64.b64decode(encoded)
-                        with open(file_path, "wb") as f:
-                            f.write(image_bytes)
-                        final_url = f"http://localhost:8000/api/v1/assets/image/{filename}"
                     except Exception as e:
-                        yield f"data: {json.dumps({'type': 'scene_error', 'scene': scene_number, 'message': f'Error guardando imagen: {str(e)}'})}\n\n"
+                        yield f"data: {json.dumps({'type': 'scene_error', 'scene': scene_number, 'message': f'Error decodificando imagen: {str(e)}'})}\n\n"
                         continue
                         
                 elif image_url.startswith("http"):
@@ -408,15 +405,44 @@ async def generate_images_stream(
                         async with httpx.AsyncClient(timeout=30.0) as http_client:
                             img_response = await http_client.get(image_url)
                             if img_response.status_code == 200:
-                                with open(file_path, "wb") as f:
-                                    f.write(img_response.content)
-                                final_url = f"http://localhost:8000/api/v1/assets/image/{filename}"
+                                image_bytes = img_response.content
                     except Exception as e:
                         yield f"data: {json.dumps({'type': 'scene_error', 'scene': scene_number, 'message': f'Error descargando imagen: {str(e)}'})}\n\n"
                         continue
                 
-                if not final_url:
+                if not image_bytes:
+                    yield f"data: {json.dumps({'type': 'scene_error', 'scene': scene_number, 'message': f'No se pudo obtener imagen para escena {scene_number}'})}\n\n"
                     continue
+                
+                # Store image and get final URL
+                final_url = None
+                
+                # Try Supabase Storage first (works in production)
+                if settings.SUPABASE_URL and settings.SUPABASE_SERVICE_KEY:
+                    try:
+                        from app.services.supabase_storage_service import SupabaseStorageService
+                        supabase_storage = SupabaseStorageService()
+                        supabase_url = await supabase_storage._upload_bytes(
+                            image_bytes, filename
+                        )
+                        if supabase_url:
+                            final_url = supabase_url
+                    except Exception as e:
+                        print(f"Supabase upload failed, falling back to local: {e}")
+                
+                # Fallback to local storage
+                if not final_url:
+                    file_path = images_dir / filename
+                    with open(file_path, "wb") as f:
+                        f.write(image_bytes)
+                    # Build URL dynamically based on environment
+                    api_host = settings.API_HOST
+                    api_port = settings.API_PORT
+                    if settings.ENV == "production":
+                        # In production, use relative path - frontend and backend on same domain or use CORS
+                        final_url = f"/api/v1/assets/image/{filename}"
+                    else:
+                        final_url = f"http://localhost:{api_port}/api/v1/assets/image/{filename}"
                 
                 # Guardar en base de datos
                 asset_id = str(uuid.uuid4())
