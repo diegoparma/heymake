@@ -23,6 +23,11 @@ export default function NewProjectPage() {
     setLoading(true);
 
     try {
+      // Remove empty strings - send null instead so backend Optional fields work
+      const cleanData = Object.fromEntries(
+        Object.entries(formData).filter(([_, v]) => v !== "" && v !== null && v !== undefined)
+      );
+
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/v1/projects/`,
         {
@@ -30,7 +35,7 @@ export default function NewProjectPage() {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(formData),
+          body: JSON.stringify(cleanData),
         }
       );
 
@@ -38,11 +43,13 @@ export default function NewProjectPage() {
         const project = await response.json();
         router.push(`/projects/${project.id}`);
       } else {
-        alert("Error al crear el proyecto");
+        const errorData = await response.json().catch(() => null);
+        const msg = errorData?.detail?.[0]?.msg || errorData?.detail || "Error al crear el proyecto";
+        alert(msg);
       }
     } catch (error) {
       console.error(error);
-      alert("Error al crear el proyecto");
+      alert("Error de conexión al crear el proyecto");
     } finally {
       setLoading(false);
     }

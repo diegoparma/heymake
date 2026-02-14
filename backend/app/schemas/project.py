@@ -19,7 +19,7 @@ class ProjectBase(BaseModel):
 
 class ProjectCreate(ProjectBase):
     """Schema para crear proyecto"""
-    original_script: Optional[str] = Field(None, min_length=10)
+    original_script: Optional[str] = Field(None)
 
 
 class ProjectUpdate(BaseModel):
